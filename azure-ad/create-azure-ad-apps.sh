@@ -9,6 +9,7 @@ az ad app create --display-name ${RBAC_SERVER_APP_NAME} \
     --password "${RBAC_SERVER_APP_SECRET}" \
     --identifier-uris "${RBAC_SERVER_APP_URL}" \
     --reply-urls "${RBAC_SERVER_APP_URL}" \
+    --homepage "${RBAC_SERVER_APP_URL}" \
     --required-resource-accesses @manifest-server.json
 
 RBAC_SERVER_APP_ID=$(az ad app list --display-name $RBAC_SERVER_APP_NAME --query [].appId -o tsv)
@@ -24,7 +25,12 @@ az ad app update --id ${RBAC_SERVER_APP_ID} --set groupMembershipClaims=All
 RBAC_SERVER_APP_RESOURCES_API_IDS=$(az ad app permission list --id $RBAC_SERVER_APP_ID --query [].resourceAppId --out tsv | xargs echo)
 for RESOURCE_API_ID in $RBAC_SERVER_APP_RESOURCES_API_IDS;
 do
-  az ad app permission grant --api $RESOURCE_API_ID --id $RBAC_SERVER_APP_ID
+  if [ "$RESOURCE_API_ID" == "00000002-0000-0000-c000-000000000000" ]
+  then
+    az ad app permission grant --api $RESOURCE_API_ID --id $RBAC_SERVER_APP_ID --scope "User.Read"
+  else
+    az ad app permission grant --api $RESOURCE_API_ID --id $RBAC_SERVER_APP_ID --scope "user_impersonation"
+  fi
 done
 
 # generate manifest for client application
@@ -46,6 +52,7 @@ EOF
 az ad app create --display-name ${RBAC_CLIENT_APP_NAME} \
     --native-app \
     --reply-urls "${RBAC_SERVER_CLIENT_URL}" \
+    --homepage "${RBAC_SERVER_CLIENT_URL}" \
     --required-resource-accesses @manifest-client.json
 
 RBAC_CLIENT_APP_ID=$(az ad app list --display-name ${RBAC_CLIENT_APP_NAME} --query [].appId -o tsv)
